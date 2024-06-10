@@ -17,14 +17,9 @@ h2.listen(8282);
 new LoadBalancer({
     type: LoadBalanceSelectType.RoundRobin,
     maps:[
-        { mode: LoadBalanceconnectMode.WorkerThreads, },        // 0
-        { mode: LoadBalanceconnectMode.WorkerThreads, },        // 1
-        { mode: LoadBalanceconnectMode.WorkerThreads, },        // 2
-        { mode: LoadBalanceconnectMode.WorkerThreads, },        // 3
-        { mode: LoadBalanceconnectMode.WorkerThreads, },        // 4
-        { mode: LoadBalanceconnectMode.WorkerThreads, },        // 5
-        { mode: LoadBalanceconnectMode.Proxy, proxy: "http://localhost:8281" }, // 6
-        { mode: LoadBalanceconnectMode.Proxy, proxy: "http://localhost:8282" }, // 7
+        { mode: LoadBalanceconnectMode.WorkerThreads, clone: 6 },        // 0
+        { mode: LoadBalanceconnectMode.Proxy, proxy: "http://localhost:8281", clone: 2  }, // 6
+        { mode: LoadBalanceconnectMode.Proxy, proxy: "http://localhost:8282", clone: 2 }, // 7
     ],
     workPath : __dirname + "/worker",
     ports: [ 1234 ],
