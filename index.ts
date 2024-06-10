@@ -30,10 +30,10 @@ import * as os from "os";
 import * as httpProxy from "http-proxy";
 
 /**
- * ### LoadBalanceSelectType
+ * ### LoadBalancerType
  * Enumerate the load balancing methods.
  */
-export enum LoadBalanceSelectType {
+export enum LoadBalancerType {
     /**
      * Round robin connection
      */
@@ -50,10 +50,10 @@ export enum LoadBalanceSelectType {
 }
 
 /**
- * ### LoadBalanceconnectMode
+ * ### LoadBalancerMode
  * Specify the connection method for each map.
  */
-export enum LoadBalanceconnectMode {
+export enum LoadBalancerMode {
     /**
      * Using WorkerThreads.
      */
@@ -69,83 +69,98 @@ export enum LoadBalanceconnectMode {
 }
 
 /**
- * ### LoadBalanceMap
+ * ### LoadBalancerMap
  * Load-balancing mapping class.
  */
-export interface LoadBalanceMap {
+export interface LoadBalancerMap {
     /**
      * ***mode*** : Specify the connection mode
      */
-    mode: LoadBalanceconnectMode,
+    mode: LoadBalancerMode,
     /**
      * ***proxy*** : Proxy Destination
      */
     proxy?: string,
 
     /**
-     * ***clone*** : 
+     * ***clone*** : Duplicate the mapping a specified number of times  
+     * Select "auto" to automatically replicate based on the number of cores in your hardware.
      */
     clone? : number | "auto",
 }
 
-class LoadBalanceMapT {
-    public mode : LoadBalanceconnectMode;
+class LoadBalancerMapT {
+    public mode : LoadBalancerMode;
     public proxy?: string;
     public threadNo? : number;
     public worker? : Worker;
     public ChildProcess? : ChildProcess;
-    public constructor(options : LoadBalanceMap) {
+    public constructor(options : LoadBalancerMap) {
         this.mode = options.mode;
         this.proxy = options.proxy;
     }
 }
 
 /**
- * ### LoadBalanceOption
+ * ### LoadBalancerOption
  * Load balancer option setting interface.
  */
-export interface LoadBalanceOption {
+export interface LoadBalancerOption {
+
     /**
      * Load Balancing Method
      */
-    type : LoadBalanceSelectType;
+    type : LoadBalancerType;
+
     /**
      * Load Balancing Mapping List
      */
-    maps : Array<LoadBalanceMap>;
+    maps : Array<LoadBalancerMap>;
 
     /**
      * List of port numbers for non-SSL servers to be load balanced
      */
     ports?: Array<number>,
+
     /**
      * A list of port numbers for the servers that will be load balanced for SSL connections.
      */
     httpsPorts?: Array<number>,
+
+    /**
+     * ***workPath*** : 
+     */
     workPath?: string,
+
+    /**
+     * ***manualHandle*** : 
+     */
     manualHandle? : Function,
 }
 
+/**
+ * ### LoadBalancer
+ */
 export class LoadBalancer {
 
     private requestBuffer = {};
 
     private rrIndex : number = 0;
 
-    private options : LoadBalanceOption;
+    private options : LoadBalancerOption;
 
     private proxy;
 
-    private maps : Array<LoadBalanceMapT>;
+    private maps : Array<LoadBalancerMapT>;
 
-    public constructor(options : LoadBalanceOption){
+    public constructor(options : LoadBalancerOption){
         this.options = options;
         this.proxy = httpProxy.createProxyServer({});
         this.maps = [];
         let threadNo : number = 0;
 
         for (let n = 0 ; n < options.maps.length ; n++) {
-            const map : LoadBalanceMap = options.maps[n];
+            const map : LoadBalancerMap = options.maps[n];
             let clone : number = 1;
             if (map.clone){
                 if (map.clone == "auto") {
@@ -156,7 +171,7 @@ export class LoadBalancer {
                 }
             }
             for (let n2 = 0 ; n2 < clone ; n2++){
-                let mapt : LoadBalanceMapT = new LoadBalanceMapT(map);
+                let mapt : LoadBalancerMapT = new LoadBalancerMapT(map);
                 mapt.threadNo = threadNo;
                 threadNo++;
                 this.maps.push(mapt);    
@@ -164,10 +179,10 @@ export class LoadBalancer {
         }
 
         for (let n = 0 ; n < this.maps.length ; n++) {
-            const map : LoadBalanceMapT = this.maps[n];
+            const map : LoadBalancerMapT = this.maps[n];
                 if (
-                map.mode == LoadBalanceconnectMode.WorkerThreads || 
-                map.mode == LoadBalanceconnectMode.ChildProcess
+                map.mode == LoadBalancerMode.WorkerThreads || 
+                map.mode == LoadBalancerMode.ChildProcess
             ) {
 
                 const sendData = {
@@ -178,10 +193,10 @@ export class LoadBalancer {
                     },
                 };
 
-                if (map.mode == LoadBalanceconnectMode.WorkerThreads) {
+                if (map.mode == LoadBalancerMode.WorkerThreads) {
                     map.worker = new Worker(__dirname + "/src/worker");
                 }
-                else if (map.mode == LoadBalanceconnectMode.ChildProcess){
+                else if (map.mode == LoadBalancerMode.ChildProcess){
                     map.ChildProcess = fork(__dirname + "/src/child_process");
                 }
 
@@ -214,7 +229,7 @@ export class LoadBalancer {
         }
     }
 
-    private onMessage(map : LoadBalanceMapT, value : any){
+    private onMessage(map : LoadBalancerMapT, value : any){
         if (!value.qid){ return; }
         if (!value.cmd){ return; }
 
@@ -241,27 +256,14 @@ export class LoadBalancer {
             buffer.res.end();
             delete this.requestBuffer[value.qid];
         }
-        /*
-        else if(value.cmd == "on"){
-            if (!value.event){ return; }
-            buffer.req.on(value.event, (data)=>{
-                this.send(map, {
-                    qid: value.qid,
-                    cmd: "on-receive",
-                    event: value.event,
-                    data: data,
-                });
-            });
-        }
-        */
         else if(value.cmd == "settimeout"){
             buffer.res.setTimeout(value.data);
         }        
     }
 
     private serverListen(req, res){
-        const map : LoadBalanceMapT = this.getMap();
-        if (map.mode == LoadBalanceconnectMode.Proxy){
+        const map : LoadBalancerMapT = this.getMap();
+        if (map.mode == LoadBalancerMode.Proxy){
             // reverse proxy access...
             this.proxy.web(req, res, { target: map.proxy });
             return;
@@ -334,11 +336,11 @@ export class LoadBalancer {
         });
     }
 
-    private getMap(type? : LoadBalanceSelectType){
+    private getMap(type? : LoadBalancerType){
         if (!type) {
             type = this.options.type;
         }
-        if (type ==LoadBalanceSelectType.RoundRobin) {
+        if (type ==LoadBalancerType.RoundRobin) {
             // Round Robin Balancing....
             if(this.rrIndex >= this.maps.length){
                 this.rrIndex = 0;
@@ -346,14 +348,14 @@ export class LoadBalancer {
             this.rrIndex++; 
             return this.maps[this.rrIndex - 1];
         }
-        else if (type == LoadBalanceSelectType.RandomRobin){
+        else if (type == LoadBalancerType.RandomRobin){
             const index = parseInt((Math.random()*1000).toString()) % this.maps.length;
             return this.maps[index];
         }
-        else if (type == LoadBalanceSelectType.Manual){
+        else if (type == LoadBalancerType.Manual){
             // Manual Balancing....
             if (!this.options.manualHandle){
-                return this.getMap(LoadBalanceSelectType.RoundRobin);
+                return this.getMap(LoadBalancerType.RoundRobin);
             }
 
             const index = this.options.manualHandle(this.maps.length);
@@ -362,19 +364,19 @@ export class LoadBalancer {
     }
 
     private send(map, sendMessage){
-        if (map.mode == LoadBalanceconnectMode.WorkerThreads){
+        if (map.mode == LoadBalancerMode.WorkerThreads){
             map.worker.postMessage(sendMessage);
         }        
-        else if (map.mode == LoadBalanceconnectMode.ChildProcess){
+        else if (map.mode == LoadBalancerMode.ChildProcess){
             map.ChildProcess.send(sendMessage);
         }
     }
 
-    private on(map: LoadBalanceMapT, event, callback){
-        if (map.mode == LoadBalanceconnectMode.WorkerThreads){
+    private on(map: LoadBalancerMapT, event, callback){
+        if (map.mode == LoadBalancerMode.WorkerThreads){
             map.worker.on(event, callback);
         }        
-        else if (map.mode == LoadBalanceconnectMode.ChildProcess){
+        else if (map.mode == LoadBalancerMode.ChildProcess){
             map.ChildProcess.on(event, callback);
         }
     }
@@ -390,16 +392,30 @@ interface HttpRequestSocket {
 export class HttpRequest {
 
     private qid;
+
+    /**
+     * ***url*** : 
+     */
     public url : string;
+
+    /**
+     * ***method*** : 
+     */
     public method : string;
+
+    /**
+     * ***headers*** : 
+     */
     public headers; 
 
+    /**
+     * ***socket*** : 
+     */
     public socket : HttpRequestSocket;
 
-    private pp;
     private onEventHandle = {};
 
-    public constructor(qid, data, pp?){
+    public constructor(qid, data){
         this.qid = qid;
         this.url = data.url;
         this.method = data.method;
@@ -409,9 +425,6 @@ export class HttpRequest {
             remotePort : data.remotePort, 
             remoteFamily : data.remoteFamily, 
         };
-        if (pp){
-            this.pp = pp;
-        }
     }
 
     public on(event, callback){
@@ -427,13 +440,19 @@ export class HttpResponse {
 
     private headers = {};
 
-    public statusCode : number;
-
-    public statusMessage : string;
-
     private text : string = "";
 
     private writeEnd : boolean = false
+
+    /**
+     * ***statusCode*** : 
+     */
+    public statusCode : number;
+
+    /**
+     * ***statusMessage*** : 
+     */
+    public statusMessage : string;
 
     public constructor(qid, req, pp?){
         this.qid = qid;
@@ -476,7 +495,7 @@ export class HttpResponse {
     }
 }
 
-export class LoadBalanceThread {
+export class LoadBalancerThread {
 
     private workerFlg : boolean = false;
     public threadNo;
@@ -512,7 +531,7 @@ export class LoadBalanceThread {
         if (value.cmd == "begin"){
             let req, res;
             if (this.workerFlg){
-                req = new HttpRequest(value.qid, value.data, parentPort);
+                req = new HttpRequest(value.qid, value.data);
                 res = new HttpResponse(value.qid, req, parentPort);    
             }
             else {

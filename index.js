@@ -23,7 +23,7 @@
  * SOFTWARE.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.LoadBalancerListner = exports.LoadBalanceThread = exports.HttpResponse = exports.HttpRequest = exports.LoadBalancer = exports.LoadBalanceconnectMode = exports.LoadBalanceSelectType = void 0;
+exports.LoadBalancerListner = exports.LoadBalancerThread = exports.HttpResponse = exports.HttpRequest = exports.LoadBalancer = exports.LoadBalancerMode = exports.LoadBalancerType = void 0;
 const worker_threads_1 = require("worker_threads");
 const child_process_1 = require("child_process");
 const http = require("http");
@@ -31,50 +31,53 @@ const https = require("https");
 const os = require("os");
 const httpProxy = require("http-proxy");
 /**
- * ### LoadBalanceSelectType
+ * ### LoadBalancerType
  * Enumerate the load balancing methods.
  */
-var LoadBalanceSelectType;
-(function (LoadBalanceSelectType) {
+var LoadBalancerType;
+(function (LoadBalancerType) {
     /**
      * Round robin connection
      */
-    LoadBalanceSelectType["RoundRobin"] = "RoundRobin";
+    LoadBalancerType["RoundRobin"] = "RoundRobin";
     /**
      * Random Connection
      */
-    LoadBalanceSelectType["RandomRobin"] = "RandomRobin";
+    LoadBalancerType["RandomRobin"] = "RandomRobin";
     /**
      * Cases where the connection destination is specified arbitrarily.
      * If you select this, you must specify **manualHandle.**
      */
-    LoadBalanceSelectType["Manual"] = "Manual";
-})(LoadBalanceSelectType || (exports.LoadBalanceSelectType = LoadBalanceSelectType = {}));
+    LoadBalancerType["Manual"] = "Manual";
+})(LoadBalancerType || (exports.LoadBalancerType = LoadBalancerType = {}));
 /**
- * ### LoadBalanceconnectMode
+ * ### LoadBalancerMode
  * Specify the connection method for each map.
  */
-var LoadBalanceconnectMode;
-(function (LoadBalanceconnectMode) {
+var LoadBalancerMode;
+(function (LoadBalancerMode) {
     /**
      * Using WorkerThreads.
      */
-    LoadBalanceconnectMode["WorkerThreads"] = "WorkerThreads";
+    LoadBalancerMode["WorkerThreads"] = "WorkerThreads";
     /**
      * Using ChildProcess.
      */
-    LoadBalanceconnectMode["ChildProcess"] = "ChildProcess";
+    LoadBalancerMode["ChildProcess"] = "ChildProcess";
     /**
      * Connect to another domain via a proxy.
      */
-    LoadBalanceconnectMode["Proxy"] = "Proxy";
-})(LoadBalanceconnectMode || (exports.LoadBalanceconnectMode = LoadBalanceconnectMode = {}));
-class LoadBalanceMapT {
+    LoadBalancerMode["Proxy"] = "Proxy";
+})(LoadBalancerMode || (exports.LoadBalancerMode = LoadBalancerMode = {}));
+class LoadBalancerMapT {
     constructor(options) {
         this.mode = options.mode;
         this.proxy = options.proxy;
     }
 }
+/**
+ * ### LoadBalancer
+ */
 class LoadBalancer {
     constructor(options) {
         this.requestBuffer = {};
@@ -95,7 +98,7 @@ class LoadBalancer {
                 }
             }
             for (let n2 = 0; n2 < clone; n2++) {
-                let mapt = new LoadBalanceMapT(map);
+                let mapt = new LoadBalancerMapT(map);
                 mapt.threadNo = threadNo;
                 threadNo++;
                 this.maps.push(mapt);
@@ -103,8 +106,8 @@ class LoadBalancer {
         }
         for (let n = 0; n < this.maps.length; n++) {
             const map = this.maps[n];
-            if (map.mode == LoadBalanceconnectMode.WorkerThreads ||
-                map.mode == LoadBalanceconnectMode.ChildProcess) {
+            if (map.mode == LoadBalancerMode.WorkerThreads ||
+                map.mode == LoadBalancerMode.ChildProcess) {
                 const sendData = {
                     cmd: "listen-start",
                     data: {
@@ -112,10 +115,10 @@ class LoadBalancer {
                         workPath: this.options.workPath,
                     },
                 };
-                if (map.mode == LoadBalanceconnectMode.WorkerThreads) {
+                if (map.mode == LoadBalancerMode.WorkerThreads) {
                     map.worker = new worker_threads_1.Worker(__dirname + "/src/worker");
                 }
-                else if (map.mode == LoadBalanceconnectMode.ChildProcess) {
+                else if (map.mode == LoadBalancerMode.ChildProcess) {
                     map.ChildProcess = (0, child_process_1.fork)(__dirname + "/src/child_process");
                 }
                 this.send(map, sendData);
@@ -171,26 +174,13 @@ class LoadBalancer {
             buffer.res.end();
             delete this.requestBuffer[value.qid];
         }
-        /*
-        else if(value.cmd == "on"){
-            if (!value.event){ return; }
-            buffer.req.on(value.event, (data)=>{
-                this.send(map, {
-                    qid: value.qid,
-                    cmd: "on-receive",
-                    event: value.event,
-                    data: data,
-                });
-            });
-        }
-        */
         else if (value.cmd == "settimeout") {
             buffer.res.setTimeout(value.data);
         }
     }
     serverListen(req, res) {
         const map = this.getMap();
-        if (map.mode == LoadBalanceconnectMode.Proxy) {
+        if (map.mode == LoadBalancerMode.Proxy) {
             // reverse proxy access...
             this.proxy.web(req, res, { target: map.proxy });
             return;
@@ -259,7 +249,7 @@ class LoadBalancer {
         if (!type) {
             type = this.options.type;
         }
-        if (type == LoadBalanceSelectType.RoundRobin) {
+        if (type == LoadBalancerType.RoundRobin) {
             // Round Robin Balancing....
             if (this.rrIndex >= this.maps.length) {
                 this.rrIndex = 0;
@@ -267,39 +257,39 @@ class LoadBalancer {
             this.rrIndex++;
             return this.maps[this.rrIndex - 1];
         }
-        else if (type == LoadBalanceSelectType.RandomRobin) {
+        else if (type == LoadBalancerType.RandomRobin) {
             const index = parseInt((Math.random() * 1000).toString()) % this.maps.length;
             return this.maps[index];
         }
-        else if (type == LoadBalanceSelectType.Manual) {
+        else if (type == LoadBalancerType.Manual) {
             // Manual Balancing....
             if (!this.options.manualHandle) {
-                return this.getMap(LoadBalanceSelectType.RoundRobin);
+                return this.getMap(LoadBalancerType.RoundRobin);
             }
             const index = this.options.manualHandle(this.maps.length);
             return this.maps[index];
         }
     }
     send(map, sendMessage) {
-        if (map.mode == LoadBalanceconnectMode.WorkerThreads) {
+        if (map.mode == LoadBalancerMode.WorkerThreads) {
             map.worker.postMessage(sendMessage);
         }
-        else if (map.mode == LoadBalanceconnectMode.ChildProcess) {
+        else if (map.mode == LoadBalancerMode.ChildProcess) {
             map.ChildProcess.send(sendMessage);
         }
     }
     on(map, event, callback) {
-        if (map.mode == LoadBalanceconnectMode.WorkerThreads) {
+        if (map.mode == LoadBalancerMode.WorkerThreads) {
             map.worker.on(event, callback);
         }
-        else if (map.mode == LoadBalanceconnectMode.ChildProcess) {
+        else if (map.mode == LoadBalancerMode.ChildProcess) {
             map.ChildProcess.on(event, callback);
         }
     }
 }
 exports.LoadBalancer = LoadBalancer;
 class HttpRequest {
-    constructor(qid, data, pp) {
+    constructor(qid, data) {
         this.onEventHandle = {};
         this.qid = qid;
         this.url = data.url;
@@ -310,9 +300,6 @@ class HttpRequest {
             remotePort: data.remotePort,
             remoteFamily: data.remoteFamily,
         };
-        if (pp) {
-            this.pp = pp;
-        }
     }
     on(event, callback) {
         this.onEventHandle[event] = callback;
@@ -361,7 +348,7 @@ class HttpResponse {
     }
 }
 exports.HttpResponse = HttpResponse;
-class LoadBalanceThread {
+class LoadBalancerThread {
     constructor(workerFlg) {
         this.workerFlg = false;
         this.requestBuffer = {};
@@ -392,7 +379,7 @@ class LoadBalanceThread {
         if (value.cmd == "begin") {
             let req, res;
             if (this.workerFlg) {
-                req = new HttpRequest(value.qid, value.data, worker_threads_1.parentPort);
+                req = new HttpRequest(value.qid, value.data);
                 res = new HttpResponse(value.qid, req, worker_threads_1.parentPort);
             }
             else {
@@ -466,7 +453,7 @@ class LoadBalanceThread {
         }
     }
 }
-exports.LoadBalanceThread = LoadBalanceThread;
+exports.LoadBalancerThread = LoadBalancerThread;
 class LoadBalancerListner {
 }
 exports.LoadBalancerListner = LoadBalancerListner;

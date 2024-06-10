@@ -1,2 +1,2 @@
-import { LoadBalanceThread } from "../";
-new LoadBalanceThread(true);
+import { LoadBalancerThread } from "../";
+new LoadBalancerThread(true);

@@ -1,4 +1,4 @@
-import { LoadBalanceconnectMode, LoadBalancer, LoadBalanceSelectType } from "../";
+import { LoadBalancerMode, LoadBalancer, LoadBalancerType } from "../";
 import * as http from "http";
 
 const h = http.createServer((req, res)=>{
@@ -15,11 +15,11 @@ h2.listen(8282);
 
 // LoadBalancing 
 new LoadBalancer({
-    type: LoadBalanceSelectType.RoundRobin,
+    type: LoadBalancerType.RoundRobin,
     maps:[
-        { mode: LoadBalanceconnectMode.WorkerThreads, clone: 6 },        // 0
-        { mode: LoadBalanceconnectMode.Proxy, proxy: "http://localhost:8281", clone: 2  }, // 6
-        { mode: LoadBalanceconnectMode.Proxy, proxy: "http://localhost:8282", clone: 2 }, // 7
+        { mode: LoadBalancerMode.WorkerThreads, clone: 6 },        // 0
+        { mode: LoadBalancerMode.Proxy, proxy: "http://localhost:8281", clone: 2  }, // 6
+        { mode: LoadBalancerMode.Proxy, proxy: "http://localhost:8282", clone: 2 }, // 7
     ],
     workPath : __dirname + "/worker",
     ports: [ 1234 ],

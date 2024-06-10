@@ -14,11 +14,11 @@ const h2 = http.createServer((req, res) => {
 h2.listen(8282);
 // LoadBalancing 
 new __1.LoadBalancer({
-    type: __1.LoadBalanceSelectType.RoundRobin,
+    type: __1.LoadBalancerType.RoundRobin,
     maps: [
-        { mode: __1.LoadBalanceconnectMode.WorkerThreads, clone: 6 }, // 0
-        { mode: __1.LoadBalanceconnectMode.Proxy, proxy: "http://localhost:8281", clone: 2 }, // 6
-        { mode: __1.LoadBalanceconnectMode.Proxy, proxy: "http://localhost:8282", clone: 2 }, // 7
+        { mode: __1.LoadBalancerMode.WorkerThreads, clone: 6 }, // 0
+        { mode: __1.LoadBalancerMode.Proxy, proxy: "http://localhost:8281", clone: 2 }, // 6
+        { mode: __1.LoadBalancerMode.Proxy, proxy: "http://localhost:8282", clone: 2 }, // 7
     ],
     workPath: __dirname + "/worker",
     ports: [1234],
