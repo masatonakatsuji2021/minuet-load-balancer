@@ -27,6 +27,7 @@ import { fork, ChildProcess } from "child_process";
 import * as http from "http";
 import * as https from "https";
 import * as os from "os";
+import * as fs from "fs";
 import * as httpProxy from "http-proxy";
 
 /**
@@ -101,6 +102,30 @@ class LoadBalancerMapT {
     }
 }
 
+export interface LoadBalancerServer {
+    type: LoadBalancerServerType,
+    port: number,
+    ssl? : LoadBalancerSSL,
+}
+export interface LoadBalancerServerT extends LoadBalancerServer{
+    http?: http.Server | https.Server,
+    webSocket? : any,   
+}
+
+export enum LoadBalancerServerType {
+    http = "http",
+    https = "https",
+    webSocket = "webSocket",
+    webSocketSSL = "webSocketSSL",
+}
+
+export interface LoadBalancerSSL {
+    domain: string,
+    key: string,
+    cert: string,
+    ca?: Array<string>,
+}
+
 /**
  * ### LoadBalancerOption
  * Load balancer option setting interface.
@@ -118,14 +143,10 @@ export interface LoadBalancerOption {
     maps : Array<LoadBalancerMap>;
 
     /**
-     * List of port numbers for non-SSL servers to be load balanced
+     * ***servers*** : Explaining server information  
+     * Port number and SSL are set for each domain
      */
-    ports?: Array<number>,
-
-    /**
-     * A list of port numbers for the servers that will be load balanced for SSL connections.
-     */
-    httpsPorts?: Array<number>,
+    servers: Array<LoadBalancerServer>,
 
     /**
      * ***workPath*** : 
@@ -152,6 +173,8 @@ export class LoadBalancer {
     private proxy;
 
     private maps : Array<LoadBalancerMapT>;
+
+   private  servers: Array<LoadBalancerServerT>;
 
     public constructor(options : LoadBalancerOption){
         this.options = options;
@@ -208,25 +231,103 @@ export class LoadBalancer {
             }
         }
 
-        if (options.ports){
-            for (let n = 0 ; n < options.ports.length ; n++) {
-                const port = options.ports[n];                
-                const h = http.createServer((req, res)=>{
-                    this.serverListen(req, res);
-                });
-                h.listen(port);
+        this.servers = options.servers;
+
+        const httpList = this.getServers(LoadBalancerServerType.http);
+
+        for (let n = 0 ; n < httpList.length ; n++){
+            // http listen
+            const http_ = httpList[n];
+            http_.http = http.createServer((req, res)=>{
+                this.serverListen(req, res);
+            }).listen(http_.port);
+
+            const wsList = this.getServers(LoadBalancerServerType.webSocket);
+
+            for (let n2 = 0 ; n2 < wsList.length ; n2++){
+                // websocket listen
+                const ws_ = wsList[n2];
+
+                // TODO....
             }
+        }
+    
+        const httpsPortList = this.gethttpsServerPortList();
+
+        for (let n = 0 ; n < httpsPortList.length ;n++){
+            const port = httpsPortList[n];
+
+            const httpsList = this.getServers(LoadBalancerServerType.https, port);
+
+            // SNICallback 
+            const options : https.ServerOptions = {
+                SNICallback: (domain : string, callback : (err: Error, ctx) => void) => {
+
+                    for (let n2 = 0 ; n2 < httpsList.length ; n2++) {
+                        // Select a different certificate for each domain
+                        const http_ : LoadBalancerServerT = httpsList[n2];
+
+                        if (domain == http_.ssl.domain) {
+                            const sslOption = {
+                                key: fs.readFileSync(http_.ssl.key),
+                                cert: fs.readFileSync(http_.ssl.cert),
+                            };
+                            // Passing the certificate to the callback.
+                            callback(null, sslOption);
+                        }
+                    }
+                }
+            };
+
+            const hs = https.createServer(options, (req, res) => {
+                this.serverListen(req, res);
+            });
+            hs.listen(port);
+
+            // TODO.....
+        }
+    }
+
+    private gethttpsServerPortList() : Array<number> {
+        let result : Array<number> = [];
+
+        for (let n = 0 ; n < this.servers.length ; n++){
+            const server = this.servers[n];
+
+            if (server.type != LoadBalancerServerType.https) {
+                continue;
+            }
+
+            if (result.indexOf(server.port) > -1){
+                continue;
+            }
+
+            result.push(server.port);
         }
 
-        if (options.httpsPorts){
-            for (let n = 0 ; n < options.httpsPorts.length ; n++) {
-                const port = options.httpsPorts[n];                
-                const h = https.createServer((req, res)=>{
-                    this.serverListen(req, res);
-                });
-                h.listen(port);
+        return result;
+    }
+
+    private getServers(type: LoadBalancerServerType, port?: number) : Array<LoadBalancerServerT> {
+        let result : Array<LoadBalancerServerT> = [];
+
+        for (let n = 0 ; n < this.servers.length ; n++){
+            const server = this.servers[n];
+
+            if (server.type != type){
+                continue;
             }
+
+            if (port){
+                if (server.port != port){
+                    continue;
+                }
+            }
+
+            result.push(server);
         }
+
+        return result;
     }
 
     private onMessage(map : LoadBalancerMapT, value : any){
@@ -497,6 +598,7 @@ export class HttpResponse {
 
 export class LoadBalancerThread {
 
+    private mode : LoadBalancerMode;
     private workerFlg : boolean = false;
     public threadNo;
     private Listener;
@@ -522,6 +624,12 @@ export class LoadBalancerThread {
         
         if (value.cmd == "listen-start"){
             this.threadNo = value.data.threadNo;
+            if (this.workerFlg){
+                this.mode = LoadBalancerMode.WorkerThreads;
+            }
+            else {
+                this.mode = LoadBalancerMode.ChildProcess;
+            }
             this.Listener = require(value.data.workPath).default;
             return;
         }
@@ -539,6 +647,7 @@ export class LoadBalancerThread {
                 res = new HttpResponse(value.qid, req);    
             }
             let listener : LoadBalancerListner = new this.Listener();
+            listener.mode = this.mode;
             listener.threadNo = this.threadNo;
             listener.req = req;
             listener.res = res;
@@ -610,6 +719,8 @@ export class LoadBalancerThread {
 }
 
 export class LoadBalancerListner {
+
+    public mode? : LoadBalancerMode;
 
     public req? : http.IncomingMessage;
 

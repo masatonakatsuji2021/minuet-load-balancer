@@ -1,4 +1,4 @@
-import { LoadBalancerMode, LoadBalancer, LoadBalancerType } from "../";
+import { LoadBalancerMode, LoadBalancer, LoadBalancerType, LoadBalancerServerType } from "../";
 import * as http from "http";
 
 const h = http.createServer((req, res)=>{
@@ -17,12 +17,17 @@ h2.listen(8282);
 new LoadBalancer({
     type: LoadBalancerType.RoundRobin,
     maps:[
-        { mode: LoadBalancerMode.WorkerThreads, clone: 6 },        // 0
-        { mode: LoadBalancerMode.Proxy, proxy: "http://localhost:8281", clone: 2  }, // 6
-        { mode: LoadBalancerMode.Proxy, proxy: "http://localhost:8282", clone: 2 }, // 7
+        { mode: LoadBalancerMode.WorkerThreads, clone: 6 },
+        { mode: LoadBalancerMode.ChildProcess,  clone: 2 },
+        { mode: LoadBalancerMode.Proxy, proxy: "http://localhost:8281", clone: 2  },
+        { mode: LoadBalancerMode.Proxy, proxy: "http://localhost:8282", clone: 2 },
+    ],
+    servers: [
+        { type:LoadBalancerServerType.http, port: 1234 },
+        { type:LoadBalancerServerType.http, port: 5678 },
     ],
     workPath : __dirname + "/worker",
-    ports: [ 1234 ],
 });
 
-
+console.log("Listen http://localhost:1234");
+console.log("Listen http://localhost:5678");

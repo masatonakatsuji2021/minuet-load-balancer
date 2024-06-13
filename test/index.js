@@ -16,10 +16,16 @@ h2.listen(8282);
 new __1.LoadBalancer({
     type: __1.LoadBalancerType.RoundRobin,
     maps: [
-        { mode: __1.LoadBalancerMode.WorkerThreads, clone: 6 }, // 0
-        { mode: __1.LoadBalancerMode.Proxy, proxy: "http://localhost:8281", clone: 2 }, // 6
-        { mode: __1.LoadBalancerMode.Proxy, proxy: "http://localhost:8282", clone: 2 }, // 7
+        { mode: __1.LoadBalancerMode.WorkerThreads, clone: 6 },
+        { mode: __1.LoadBalancerMode.ChildProcess, clone: 2 },
+        { mode: __1.LoadBalancerMode.Proxy, proxy: "http://localhost:8281", clone: 2 },
+        { mode: __1.LoadBalancerMode.Proxy, proxy: "http://localhost:8282", clone: 2 },
+    ],
+    servers: [
+        { type: __1.LoadBalancerServerType.http, port: 1234 },
+        { type: __1.LoadBalancerServerType.http, port: 5678 },
     ],
     workPath: __dirname + "/worker",
-    ports: [1234],
 });
+console.log("Listen http://localhost:1234");
+console.log("Listen http://localhost:5678");
