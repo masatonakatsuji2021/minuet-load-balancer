@@ -1,6 +1,26 @@
 {
   "name": "minuet-load-balancer",
   "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/masatonakatsuji2021/minuet_load_balancer.git"
+  },
+  "keywords": [
+    "load-balancer",
+    "node",
+    "http-proxy",
+    "js-yaml"
+  ],
+  "author": "Masato Nakatsuji",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/masatonakatsuji2021/minuet_load_balancer/issues"
+  },
+  "homepage": "https://github.com/masatonakatsuji2021/minuet_load_balancer#readme",
   "dependencies": {
     "@types/node": "^20.12.12",
     "http-proxy": "^1.18.1",
