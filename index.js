@@ -76,11 +76,26 @@ class LoadBalancerMapT {
         this.proxy = options.proxy;
     }
 }
+/**
+ * ***LoadBalancerServerType``` : Enumerate the types of servers to deploy..
+ */
 var LoadBalancerServerType;
 (function (LoadBalancerServerType) {
+    /**
+     * ***http*** : Web server with http protocol (non-SSL).
+     */
     LoadBalancerServerType["http"] = "http";
+    /**
+     * ***https*** : Web server with https protocol (SSL connection).
+     */
     LoadBalancerServerType["https"] = "https";
+    /**
+     * ***webSocket*** : Non-SSL WebSocket Server.
+     */
     LoadBalancerServerType["webSocket"] = "webSocket";
+    /**
+     * ***webSocketSSL*** : WebSocket server for SSL connections.
+     */
     LoadBalancerServerType["webSocketSSL"] = "webSocketSSL";
 })(LoadBalancerServerType || (exports.LoadBalancerServerType = LoadBalancerServerType = {}));
 /**
@@ -522,6 +537,10 @@ class LoadBalancerThread {
     }
 }
 exports.LoadBalancerThread = LoadBalancerThread;
+/**
+ * ***LoadBalancerListner*** : Server Listen class.
+ * Export the inherited class of this class in the worker file when listening.
+ */
 class LoadBalancerListner {
 }
 exports.LoadBalancerListner = LoadBalancerListner;

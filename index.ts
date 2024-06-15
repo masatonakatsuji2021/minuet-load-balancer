@@ -103,26 +103,66 @@ class LoadBalancerMapT {
 }
 
 export interface LoadBalancerServer {
+    /**
+     * ***type*** : The type of server you are deploying.  
+     */
     type: LoadBalancerServerType,
+    /**
+     * ***port*** : The port number of the server to be deployed.
+     */
     port: number,
+    /**
+     * ***ssl*** : SSL settings for the server you want to deploy.
+     */
     ssl? : LoadBalancerSSL,
 }
+
 export interface LoadBalancerServerT extends LoadBalancerServer{
     http?: http.Server | https.Server,
     webSocket? : any,   
 }
 
+/**
+ * ***LoadBalancerServerType``` : Enumerate the types of servers to deploy..
+ */
 export enum LoadBalancerServerType {
+    /**
+     * ***http*** : Web server with http protocol (non-SSL).
+     */
     http = "http",
+    /**
+     * ***https*** : Web server with https protocol (SSL connection).
+     */
     https = "https",
+    /**
+     * ***webSocket*** : Non-SSL WebSocket Server.
+     */
     webSocket = "webSocket",
+    /**
+     * ***webSocketSSL*** : WebSocket server for SSL connections.
+     */
     webSocketSSL = "webSocketSSL",
 }
 
+/**
+ * ***LoadBalancerSSL*** : SSL connection setting interface
+ */
 export interface LoadBalancerSSL {
+    /**
+     * ***domain*** : SSL connection domain name.
+     */
     domain: string,
+    /**
+     * ***key*** : SSL connection key file path.
+     */
     key: string,
+    /**
+     * ***cert*** : SSL server certificate file path.
+     */
     cert: string,
+    /**
+     * ***ca*** : CA intermediate certificate file paths.
+     */
     ca?: Array<string>,
 }
 
@@ -156,7 +196,7 @@ export interface LoadBalancerOption {
     /**
      * ***manualHandle*** : 
      */
-    manualHandle? : Function,
+    manualHandle? : (mapLength : number) => number,
 }
 
 /**
@@ -715,14 +755,30 @@ export class LoadBalancerThread {
     }
 }
 
+/**
+ * ***LoadBalancerListner*** : Server Listen class.  
+ * Export the inherited class of this class in the worker file when listening.
+ */
 export class LoadBalancerListner {
 
+    /**
+     * ***mode*** : Load Balancing Mode
+     */
     public mode? : LoadBalancerMode;
 
+    /**
+     * ***req*** : Server Request Information.
+     */
     public req? : http.IncomingMessage;
 
+    /**
+     * ***res*** : Server response information
+     */
     public res? : http.ServerResponse<http.IncomingMessage>;
 
+    /**
+     * ***threadNo*** : Thread number for load balancing.
+     */
     public threadNo? : number;
 
     public request?() : void;
