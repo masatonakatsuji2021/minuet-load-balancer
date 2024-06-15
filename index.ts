@@ -652,6 +652,9 @@ export class LoadBalancerThread {
             listener.req = req;
             listener.res = res;
             this.requestBuffer[value.qid] = listener;
+            if (listener.request){
+                listener.request();
+            }
             return;
         }
     
@@ -659,13 +662,7 @@ export class LoadBalancerThread {
     
         const listener = this.requestBuffer[value.qid];
     
-        if (listener.request){
-            listener.request();
-        }
-
-        let cmd = value.cmd;
-    
-        if (cmd=="data"){
+        if (value.cmd=="data"){
             if (listener.onData){
                 listener.onData(value.option);
             }
@@ -673,7 +670,7 @@ export class LoadBalancerThread {
                 listener.req.onEventHandle.data(value.option);
             }
         }
-        else if (cmd == "end"){
+        else if (value.cmd == "end"){
             if (listener.onEnd){
                 listener.onEnd();
             }
@@ -681,7 +678,7 @@ export class LoadBalancerThread {
                 listener.req.onEventHandle.end();
             }
         }
-        else if (cmd == "close") {
+        else if (value.cmd == "close") {
             if (listener.onClose){
                 listener.onClose();
             }
@@ -690,7 +687,7 @@ export class LoadBalancerThread {
             }
             delete this.requestBuffer[value.qid];
         }
-        else if (cmd == "error") {
+        else if (value.cmd == "error") {
             if (listener.onError){
                 listener.onError(value.option);
             }
@@ -699,7 +696,7 @@ export class LoadBalancerThread {
             }
             delete this.requestBuffer[value.qid];
         }
-        else if (cmd == "pause") {
+        else if (value.cmd == "pause") {
             if (listener.onPause){
                 listener.onPause();
             }
@@ -707,7 +704,7 @@ export class LoadBalancerThread {
                 listener.req.onEventHandle.pause(value.option);
             }
         }
-        else if (cmd == "resume") {
+        else if (value.cmd == "resume") {
             if (listener.onResume){
                 listener.onResume();
             }
