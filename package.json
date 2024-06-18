@@ -23,7 +23,6 @@
   "homepage": "https://github.com/masatonakatsuji2021/minuet_load_balancer#readme",
   "dependencies": {
     "@types/node": "^20.12.12",
-    "http-proxy": "^1.18.1",
-    "js-yaml": "^4.1.0"
+    "http-proxy": "^1.18.1"
   }
 }

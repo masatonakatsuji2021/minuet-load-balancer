@@ -257,10 +257,10 @@ export class LoadBalancer {
                 };
 
                 if (map.mode == LoadBalancerMode.WorkerThreads) {
-                    map.worker = new Worker(__dirname + "/src/worker");
+                    map.worker = new Worker(__dirname + "/src/worker.js");
                 }
                 else if (map.mode == LoadBalancerMode.ChildProcess){
-                    map.ChildProcess = fork(__dirname + "/src/child_process");
+                    map.ChildProcess = fork(__dirname + "/src/child_process.js");
                 }
 
                 this.send(map, sendData);

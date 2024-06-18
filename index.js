@@ -139,10 +139,10 @@ class LoadBalancer {
                     },
                 };
                 if (map.mode == LoadBalancerMode.WorkerThreads) {
-                    map.worker = new worker_threads_1.Worker(__dirname + "/src/worker");
+                    map.worker = new worker_threads_1.Worker(__dirname + "/src/worker.js");
                 }
                 else if (map.mode == LoadBalancerMode.ChildProcess) {
-                    map.ChildProcess = (0, child_process_1.fork)(__dirname + "/src/child_process");
+                    map.ChildProcess = (0, child_process_1.fork)(__dirname + "/src/child_process.js");
                 }
                 this.send(map, sendData);
                 this.on(map, "message", (value) => {
