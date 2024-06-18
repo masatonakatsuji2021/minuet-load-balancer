@@ -774,7 +774,7 @@ export class LoadBalancerListner {
     /**
      * ***res*** : Server response information
      */
-    public res? : http.ServerResponse<http.IncomingMessage>;
+    public res? : http.ServerResponse;
 
     /**
      * ***threadNo*** : Thread number for load balancing.
