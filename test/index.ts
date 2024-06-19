@@ -27,6 +27,9 @@ new LoadBalancer({
         { type:LoadBalancerServerType.http, port: 5678 },
     ],
     workPath : __dirname + "/worker",
+    option: {
+        data:"aaaaaaaaaaaaaaaaaa....OK",
+    }
 });
 
 console.log("Listen http://localhost:1234");

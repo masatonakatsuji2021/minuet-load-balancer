@@ -197,6 +197,12 @@ export interface LoadBalancerOption {
      * ***manualHandle*** : 
      */
     manualHandle? : (mapLength : number) => number,
+
+    /**
+     * ***option*** : When WorkerThreads or ChildProcess is specified,  
+     * data information to be passed to another thread or process
+     */
+    option? : Object,
 }
 
 /**
@@ -253,6 +259,7 @@ export class LoadBalancer {
                     data: {
                         threadNo: map.threadNo,
                         workPath: this.options.workPath,
+                        option: this.options.option,
                     },
                 };
 
@@ -671,6 +678,12 @@ export class LoadBalancerThread {
                 this.mode = LoadBalancerMode.ChildProcess;
             }
             this.Listener = require(value.data.workPath).default;
+            if (value.data.option) {
+                this.Listener.option = value.data.option;
+            }
+            if (this.Listener.begin){
+                this.Listener.begin();
+            }
             return;
         }
     
@@ -780,6 +793,10 @@ export class LoadBalancerListner {
      * ***threadNo*** : Thread number for load balancing.
      */
     public threadNo? : number;
+
+    public static option?;
+
+    public static begin?() : void;
 
     public request?() : void;
 

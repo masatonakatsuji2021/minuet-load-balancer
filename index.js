@@ -136,6 +136,7 @@ class LoadBalancer {
                     data: {
                         threadNo: map.threadNo,
                         workPath: this.options.workPath,
+                        option: this.options.option,
                     },
                 };
                 if (map.mode == LoadBalancerMode.WorkerThreads) {
@@ -454,6 +455,12 @@ class LoadBalancerThread {
                 this.mode = LoadBalancerMode.ChildProcess;
             }
             this.Listener = require(value.data.workPath).default;
+            if (value.data.option) {
+                this.Listener.option = value.data.option;
+            }
+            if (this.Listener.begin) {
+                this.Listener.begin();
+            }
             return;
         }
         if (!value.qid) {
