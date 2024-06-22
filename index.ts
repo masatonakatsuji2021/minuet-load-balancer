@@ -619,6 +619,10 @@ export class HttpResponse {
         return this;
     }
 
+    public getHeader(name : string) : string | number | undefined {
+        return this.headers[name];
+    }
+
     public end(){
         if (this.writeEnd){
             return;

@@ -402,6 +402,9 @@ class HttpResponse {
         this.headers[name] = value;
         return this;
     }
+    getHeader(name) {
+        return this.headers[name];
+    }
     end() {
         if (this.writeEnd) {
             return;
