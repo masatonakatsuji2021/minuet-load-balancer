@@ -430,7 +430,6 @@ class HttpResponse {
 }
 exports.HttpResponse = HttpResponse;
 class LoadBalancerThread {
-    //    private requestBuffer = {};
     constructor(workerFlg) {
         this.workerFlg = false;
         this.workerFlg = workerFlg;
