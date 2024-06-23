@@ -561,7 +561,7 @@ export class HttpRequest {
      */
     public socket : HttpRequestSocket;
 
-    private onEventHandle = {};
+    public onEventHandle : any = {};
 
     public constructor(qid, data){
         this.qid = qid;
@@ -652,8 +652,7 @@ export class LoadBalancerThread {
     private mode : LoadBalancerMode;
     private workerFlg : boolean = false;
     public threadNo;
-    private Listener;
-    private requestBuffer = {};
+    private Listener : LoadBalancerListner;
     
     public constructor(workerFlg : boolean){
         this.workerFlg = workerFlg;
@@ -681,10 +680,11 @@ export class LoadBalancerThread {
             else {
                 this.mode = LoadBalancerMode.ChildProcess;
             }
-            this.Listener = require(value.data.workPath).default;
-            if (value.data.option) {
-                this.Listener.option = value.data.option;
-            }
+            const listenerClass = require(value.data.workPath).default;
+            this.Listener = new listenerClass();
+            this.Listener.mode = this.mode;
+            this.Listener.threadNo = this.threadNo;
+            if (value.data.option) this.Listener.option = value.data.option;
             if (this.Listener.begin){
                 this.Listener.begin();
             }
@@ -703,70 +703,46 @@ export class LoadBalancerThread {
                 req = new HttpRequest(value.qid, value.data);
                 res = new HttpResponse(value.qid, req);    
             }
-            let listener : LoadBalancerListner = new this.Listener();
-            listener.mode = this.mode;
-            listener.threadNo = this.threadNo;
-            listener.req = req;
-            listener.res = res;
-            this.requestBuffer[value.qid] = listener;
-            if (listener.request){
-                listener.request();
+            this.Listener.qids[value.qid] = { req, res };
+            if (this.Listener.listen){
+                this.Listener.listen(req, res);
             }
             return;
         }
     
-        if (!this.requestBuffer[value.qid]){ return; }
-    
-        const listener = this.requestBuffer[value.qid];
-    
+        if (!this.Listener.qids[value.qid]){ return; }
+        const buffer : { req: HttpRequest, res:http.ServerResponse } = this.Listener.qids[value.qid];
+
         if (value.cmd=="data"){
-            if (listener.onData){
-                listener.onData(value.option);
-            }
-            if (listener.req.onEventHandle.data){
-                listener.req.onEventHandle.data(value.option);
+            if (buffer.req.onEventHandle.data){
+                buffer.req.onEventHandle.data(value.option);
             }
         }
         else if (value.cmd == "end"){
-            if (listener.onEnd){
-                listener.onEnd();
-            }
-            if (listener.req.onEventHandle.end){
-                listener.req.onEventHandle.end();
+            if (buffer.req.onEventHandle.end){
+                buffer.req.onEventHandle.end();
             }
         }
         else if (value.cmd == "close") {
-            if (listener.onClose){
-                listener.onClose();
+            if (buffer.req.onEventHandle.close){
+                buffer.req.onEventHandle.close();
             }
-            if (listener.req.onEventHandle.close){
-                listener.req.onEventHandle.close();
-            }
-            delete this.requestBuffer[value.qid];
+            delete this.Listener.qids[value.qid];
         }
         else if (value.cmd == "error") {
-            if (listener.onError){
-                listener.onError(value.option);
+            if (buffer.req.onEventHandle.error){
+                buffer.req.onEventHandle.error(value.option);
             }
-            if (listener.req.onEventHandle.error){
-                listener.req.onEventHandle.error(value.option);
-            }
-            delete this.requestBuffer[value.qid];
+            delete this.Listener.qids[value.qid];
         }
         else if (value.cmd == "pause") {
-            if (listener.onPause){
-                listener.onPause();
-            }
-            if (listener.req.onEventHandle.pause){
-                listener.req.onEventHandle.pause(value.option);
+            if (buffer.req.onEventHandle.pause){
+                buffer.req.onEventHandle.pause(value.option);
             }
         }
         else if (value.cmd == "resume") {
-            if (listener.onResume){
-                listener.onResume();
-            }
-            if (listener.req.onEventHandle.resume){
-                listener.req.onEventHandle.resume(value.option);
+            if (buffer.req.onEventHandle.resume){
+                buffer.req.onEventHandle.resume(value.option);
             }
         } 
     }
@@ -784,35 +760,31 @@ export class LoadBalancerListner {
     public mode? : LoadBalancerMode;
 
     /**
-     * ***req*** : Server Request Information.
-     */
-    public req? : http.IncomingMessage;
-
-    /**
-     * ***res*** : Server response information
-     */
-    public res? : http.ServerResponse;
-
-    /**
      * ***threadNo*** : Thread number for load balancing.
      */
     public threadNo? : number;
 
-    public static option?;
+    public qids = {};
 
-    public static begin?() : void;
+    public option?;
 
-    public request?() : void;
+    /**
+     * ***begin``` : An event handler that runs when a thread or process starts.
+     */
+    public begin?() : void;
 
-    public onData?(data : any) : void;
+    public sniCallback?() : void;
 
-    public onEnd?() : void;
+    /**
+     * ***listen*** : Request Wait Handler
+     * @param {http.IncomingMessage} req 
+     * @param {http.ServerResponse} res 
+     */
+    public listen?(req : http.IncomingMessage, res : http.ServerResponse) : void;
 
-    public onClose?() : void;
-
-    public onError?(error : any) : void;
-
-    public onPause?() : void;
-
-    public onResume?() : void;
+    /**
+     * ***weLiseten*** : WebSocket post-connection event handler.
+     * @param webSocket 
+     */
+    public wsListen?(webSocket) : void;
 }

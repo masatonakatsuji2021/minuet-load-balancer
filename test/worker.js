@@ -2,9 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const __1 = require("../");
 class Listener extends __1.LoadBalancerListner {
-    request() {
-        const req = this.req;
-        const res = this.res;
+    listen(req, res) {
         req.on("end", () => {
             res.statusMessage = "A, R, E!!";
             res.setHeader("name", "minuet-server.19.0.0");

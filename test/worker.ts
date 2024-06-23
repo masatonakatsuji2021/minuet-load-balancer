@@ -1,10 +1,9 @@
+import { IncomingMessage, ServerResponse } from "http";
 import { LoadBalancerListner } from "../";
 
 export default class Listener extends LoadBalancerListner {
     
-    public request(): void {
-        const req = this.req;
-        const res = this.res;
+    public listen(req: IncomingMessage, res: ServerResponse ): void {
 
         req.on("end", ()=>{
             res.statusMessage = "A, R, E!!";
