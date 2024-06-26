@@ -1,5 +1,5 @@
 import { IncomingMessage, ServerResponse } from "http";
-import { LoadBalancerListner } from "../";
+import { LoadBalancerListner } from "minuet-load-balancer";
 
 export default class Listener extends LoadBalancerListner {
     

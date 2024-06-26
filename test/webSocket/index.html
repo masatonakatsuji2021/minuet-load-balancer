@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<body>
+<div class="output"></div>
+<button class="btn">Click</button>
+<script>
+ const socket = new WebSocket('ws://localhost:6222');
+
+socket.addEventListener('open', () => {
+
+    socket.addEventListener("message", (event)=>{
+
+        console.log(event.data);
+    });
+
+    socket.addEventListener("close", (ev)=>{
+
+        console.log(ev);
+    });
+});
+
+document.querySelector(".btn").addEventListener("click", ()=>{
+
+    socket.send("client message ....");
+});
+
+</script>
+</body>
+</html>

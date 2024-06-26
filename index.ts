@@ -27,8 +27,8 @@ import { fork, ChildProcess } from "child_process";
 import * as http from "http";
 import * as https from "https";
 import * as os from "os";
-import * as fs from "fs";
 import * as httpProxy from "http-proxy";
+import * as ws from "ws";
 
 /**
  * ### LoadBalancerType
@@ -114,7 +114,7 @@ export interface LoadBalancerServer {
     /**
      * ***ssl*** : SSL settings for the server you want to deploy.
      */
-    ssl? : LoadBalancerSSL,
+//    ssl? : LoadBalancerSSL,
 }
 
 export interface LoadBalancerServerT extends LoadBalancerServer{
@@ -147,24 +147,26 @@ export enum LoadBalancerServerType {
 /**
  * ***LoadBalancerSSL*** : SSL connection setting interface
  */
+/*
 export interface LoadBalancerSSL {
     /**
      * ***domain*** : SSL connection domain name.
-     */
+     *
     domain: string,
     /**
      * ***key*** : SSL connection key file path.
-     */
+     *
     key: string,
     /**
      * ***cert*** : SSL server certificate file path.
-     */
+     *
     cert: string,
     /**
      * ***ca*** : CA intermediate certificate file paths.
-     */
+     *
     ca?: Array<string>,
 }
+*/
 
 /**
  * ### LoadBalancerOption
@@ -224,7 +226,7 @@ export class LoadBalancer {
 
     public constructor(options : LoadBalancerOption){
         this.options = options;
-        this.proxy = httpProxy.createProxyServer({});
+        this.proxy = httpProxy.createProxyServer({ ws: true });
         this.maps = [];
         let threadNo : number = 0;
 
@@ -280,59 +282,71 @@ export class LoadBalancer {
 
         this.servers = options.servers;
 
+        // http listen
         const httpList = this.getServers(LoadBalancerServerType.http);
+        let httpPortList = {};
+        if (httpList) {
+            for (let n = 0 ; n < httpList.length ; n++){
+                // http listen
+                const http_ = httpList[n];
+                http_.http = http.createServer((req, res)=>{
+                    this.serverListen(req, res);
+                }).listen(http_.port);
+                httpPortList[http_.port] = http_.http;
+            }
+        }
 
-        for (let n = 0 ; n < httpList.length ; n++){
-            // http listen
-            const http_ = httpList[n];
-            http_.http = http.createServer((req, res)=>{
-                this.serverListen(req, res);
-            }).listen(http_.port);
-
-            const wsList = this.getServers(LoadBalancerServerType.webSocket);
-
-            for (let n2 = 0 ; n2 < wsList.length ; n2++){
+        // WebSocket listen
+        const wsList = this.getServers(LoadBalancerServerType.webSocket);
+        if (wsList) {
+            for (let n = 0 ; n < wsList.length ; n++){
                 // websocket listen
-                const ws_ = wsList[n2];
+                const ws_ = wsList[n];
 
-                // TODO....
+                let http_;
+                if (httpPortList[ws_.port]) {
+                    http_ = httpPortList[ws_.port];
+                }
+                else {
+                    http_ = http.createServer().listen(ws_.port);
+                }
+                ws_.webSocket = new ws.Server({ server:http_ });
+
+                ws_.webSocket.on("connection", (webSocket, request) => {
+                    this.serverListenWebSocket(webSocket, request);
+                });
             }
         }
     
+        
         const httpsPortList = this.gethttpsServerPortList();
+        if (httpsPortList.length) {
+            const listenerClass = require(options.workPath).default;
+            const listener : LoadBalancerListner = new listenerClass();
 
-        for (let n = 0 ; n < httpsPortList.length ;n++){
-            const port = httpsPortList[n];
+            for (let n = 0 ; n < httpsPortList.length ;n++){
+                const port = httpsPortList[n];
 
-            const httpsList = this.getServers(LoadBalancerServerType.https, port);
+                const httpsList = this.getServers(LoadBalancerServerType.https, port);
 
-            // SNICallback 
-            const options : https.ServerOptions = {
-                SNICallback: (domain : string, callback : (err: Error, ctx) => void) => {
-
-                    for (let n2 = 0 ; n2 < httpsList.length ; n2++) {
-                        // Select a different certificate for each domain
-                        const http_ : LoadBalancerServerT = httpsList[n2];
-
-                        if (domain == http_.ssl.domain) {
-                            const sslOption = {
-                                key: fs.readFileSync(http_.ssl.key),
-                                cert: fs.readFileSync(http_.ssl.cert),
-                            };
-                            // Passing the certificate to the callback.
-                            callback(null, sslOption);
+                // SNICallback 
+                const options : https.ServerOptions = {
+                    SNICallback: (domain : string, callback : (err: Error, ctx) => void) => {
+                        if (listener.sniCallback) {
+                            listener.sniCallback(domain, callback);
                         }
                     }
-                }
-            };
+                };
 
-            const hs = https.createServer(options, (req, res) => {
-                this.serverListen(req, res);
-            });
-            hs.listen(port);
-
-            // TODO.....
+                const hs = https.createServer(options, (req, res) => {
+                    this.serverListen(req, res);
+                });
+                hs.listen(port);
+            }
         }
+
+
+
     }
 
     private gethttpsServerPortList() : Array<number> {
@@ -407,6 +421,12 @@ export class LoadBalancer {
         else if(value.cmd == "settimeout"){
             buffer.res.setTimeout(value.data);
         }        
+        else if(value.cmd == "ws-send") {
+            buffer.webSocket.send(value.data);
+        }
+        else if(value.cmd == "ws-close") {
+            buffer.webSocket.close(value.data.code, value.data.reason);
+        }
     }
 
     private serverListen(req, res){
@@ -428,7 +448,6 @@ export class LoadBalancer {
             remortPort: req.socket.remotePort,
             remoteFamily: req.socket.remoteFamily,
         };
-
 
         this.send(map, {
             qid: qid,
@@ -482,6 +501,40 @@ export class LoadBalancer {
                 data: sendData,
             });
         });
+    }
+
+    private serverListenWebSocket(webSocket : WebSocket, req : http.IncomingMessage) {
+        const map : LoadBalancerMapT = this.getMap();
+        if (map.mode == LoadBalancerMode.Proxy){
+            // reverse proxy access...
+            return;
+        }
+
+        const qid = Math.random();
+        this.requestBuffer[qid] = { webSocket };
+
+        const sendData = {
+            url: req.url,
+            method: req.method,
+            headers: req.headers,
+            remoteAddress: req.socket.remoteAddress,
+            remortPort: req.socket.remotePort,
+            remoteFamily: req.socket.remoteFamily,
+        };
+
+        this.send(map, {
+            qid: qid,
+            cmd: "ws-begin",
+            data: sendData,
+        });
+
+        webSocket.onmessage = (event) => {
+            this.send(map, {
+                qid: qid,
+                cmd: "ws-message",
+                option: event.data,
+            });
+        };
     }
 
     private getMap(type? : LoadBalancerType){
@@ -647,6 +700,64 @@ export class HttpResponse {
     }
 }
 
+export class WebSocketResponse {
+
+    public qid;
+    
+    private pp;
+    
+    private closed;
+
+    public onEventHandle : any = {};
+
+    public constructor(qid, pp?) {
+        this.qid = qid;
+        if (pp){
+            this.pp = pp;
+        }
+    }
+
+    public on(event, callback) {
+        this.onEventHandle[event] = callback;
+    }
+
+    public write(message) {
+        if (this.closed) return;
+        const send = {
+            qid: this.qid,
+            cmd: "ws-send",
+            data: message,
+        };
+        if(this.pp){
+            this.pp.postMessage(send);
+        }
+        else{
+            process.send(send);
+        }
+    }
+
+    public close(code?: number, reason?: string) {
+        if (this.closed) return;
+        if (!this.closed){
+            this.closed = true;
+        }
+        const send = {
+            qid: this.qid,
+            cmd: "ws-close",
+            data : {
+                code: code,
+                reason : reason,
+            },
+        };
+        if(this.pp){
+            this.pp.postMessage(send);
+        }
+        else{
+            process.send(send);
+        }
+    }
+}
+
 export class LoadBalancerThread {
 
     private mode : LoadBalancerMode;
@@ -709,9 +820,25 @@ export class LoadBalancerThread {
             }
             return;
         }
-    
+        if (value.cmd == "ws-begin") {
+            let webSocket, req;
+            if (this.workerFlg){
+                req = new HttpRequest(value.qid, value.data);
+                webSocket = new WebSocketResponse(value.qid, parentPort);
+            }
+            else {
+                req = new HttpRequest(value.qid, value.data);
+                webSocket = new WebSocketResponse(value.qid);
+            }
+            this.Listener.qids[value.qid] = { webSocket };
+            if (this.Listener.wsListen){
+                this.Listener.wsListen(webSocket, req);
+            }
+            return;
+        }
+        
         if (!this.Listener.qids[value.qid]){ return; }
-        const buffer : { req: HttpRequest, res:http.ServerResponse } = this.Listener.qids[value.qid];
+        const buffer : { req: HttpRequest, res:http.ServerResponse, webSocket: WebSocketResponse } = this.Listener.qids[value.qid];
 
         if (value.cmd=="data"){
             if (buffer.req.onEventHandle.data){
@@ -745,6 +872,16 @@ export class LoadBalancerThread {
                 buffer.req.onEventHandle.resume(value.option);
             }
         } 
+        else if (value.cmd == "ws-message") {
+            if (buffer.webSocket.onEventHandle.message){
+                buffer.webSocket.onEventHandle.message(value.option);
+            }
+        }
+        else if (value.cmd == "ws-close") {
+            if (buffer.webSocket.onEventHandle.close){
+                buffer.webSocket.onEventHandle.close(value.option);
+            }
+        }
     }
 }
 
@@ -773,7 +910,10 @@ export class LoadBalancerListner {
      */
     public begin?() : void;
 
-    public sniCallback?() : void;
+    /**
+     * ***sniCallback*** : For SSL authentication, specify the private key and server certificate for each domain in this callback.
+     */
+    public sniCallback?(domain : string, callback : (err: Error, ctx) => void) : void;
 
     /**
      * ***listen*** : Request Wait Handler
@@ -786,5 +926,5 @@ export class LoadBalancerListner {
      * ***weLiseten*** : WebSocket post-connection event handler.
      * @param webSocket 
      */
-    public wsListen?(webSocket) : void;
+    public wsListen?(webSocket : WebSocket, reques : http.IncomingMessage) : void;
 }

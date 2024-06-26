@@ -1,4 +1,4 @@
-import { LoadBalancerMode, LoadBalancer, LoadBalancerType, LoadBalancerServerType } from "../";
+import { LoadBalancerMode, LoadBalancer, LoadBalancerType, LoadBalancerServerType } from "minuet-load-balancer";
 import * as http from "http";
 
 const h = http.createServer((req, res)=>{

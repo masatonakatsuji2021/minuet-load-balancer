@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-const __1 = require("../");
-class Listener extends __1.LoadBalancerListner {
+const minuet_load_balancer_1 = require("minuet-load-balancer");
+class Listener extends minuet_load_balancer_1.LoadBalancerListner {
     listen(req, res) {
         req.on("end", () => {
             res.statusMessage = "A, R, E!!";
