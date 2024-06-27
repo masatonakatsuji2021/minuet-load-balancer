@@ -287,9 +287,11 @@ class LoadBalancer {
             url: req.url,
             method: req.method,
             headers: req.headers,
-            remoteAddress: req.socket.remoteAddress,
-            remortPort: req.socket.remotePort,
-            remoteFamily: req.socket.remoteFamily,
+            socket: {
+                remoteAddress: req.socket.remoteAddress,
+                remortPort: req.socket.remotePort,
+                remoteFamily: req.socket.remoteFamily,
+            },
         };
         this.send(map, {
             qid: qid,
@@ -435,7 +437,7 @@ class HttpResponse {
     constructor(qid, req, pp) {
         this.headers = {};
         this.text = "";
-        this.writeEnd = false;
+        this.writable = false;
         this.qid = qid;
         if (pp) {
             this.pp = pp;
@@ -453,10 +455,10 @@ class HttpResponse {
         return this.headers[name];
     }
     end() {
-        if (this.writeEnd) {
+        if (this.writable) {
             return;
         }
-        this.writeEnd = true;
+        this.writable = true;
         const send = {
             qid: this.qid,
             cmd: "end",

@@ -444,9 +444,11 @@ export class LoadBalancer {
             url: req.url,
             method: req.method,
             headers: req.headers,
-            remoteAddress: req.socket.remoteAddress,
-            remortPort: req.socket.remotePort,
-            remoteFamily: req.socket.remoteFamily,
+            socket: {
+                remoteAddress: req.socket.remoteAddress,
+                remortPort: req.socket.remotePort,
+                remoteFamily: req.socket.remoteFamily,    
+            },
         };
 
         this.send(map, {
@@ -643,7 +645,7 @@ export class HttpResponse {
 
     private text : string = "";
 
-    private writeEnd : boolean = false
+    private writable : boolean = false
 
     /**
      * ***statusCode*** : 
@@ -677,10 +679,10 @@ export class HttpResponse {
     }
 
     public end(){
-        if (this.writeEnd){
+        if (this.writable){
             return;
         }
-        this.writeEnd = true;
+        this.writable = true;
         const send = {
             qid: this.qid,
             cmd: "end",
